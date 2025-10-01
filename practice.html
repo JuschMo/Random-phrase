@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sentence Trainer — Practice</title>
+<link rel="icon" href="data:;base64,=">
+<style>
+  :root{
+    --radius:18px; --btnText:#0b1b19;
+    --prompt-min:40px; --prompt-max:84px; --ans-min:34px; --ans-max:64px;
+    /* Defaults (overridden by theme classes) */
+    --page-bg:#0f1216;
+    --board-bg:#0d1218;
+    --board-border:#222a36;
+    --text:#e6e9ee;
+    --muted:#b6c4d6;
+  }
+
+  /* === THEMES === */
+  body.theme-sleek{
+    --page-bg:#293961;      /* requested */
+    --board-bg:#000000;     /* black box */
+    --board-border:#3a4766; /* subtle border to frame black-on-blue */
+    --text:#ffffff;
+    --muted:#d7deea;
+  }
+  body.theme-playful{
+    --page-bg:#ffd700;      /* yellow page */
+    --board-bg:#ffffff;     /* white text box */
+    --board-border:#e0e0e0;
+    --text:#000000;         /* black writing */
+    --muted:#333333;
+  }
+  body.theme-exam{
+    --page-bg:#000000;      /* black page */
+    --board-bg:#000000;     /* black box */
+    --board-border:#333842; /* thin outline so it’s still visible */
+    --text:#ffffff;         /* white writing */
+    --muted:#d9dde5;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font:16px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--page-bg);
+    color:var(--text);
+  }
+  .wrap{max-width:960px;margin:6vh auto;padding:24px}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap}
+  h1{font-size:clamp(20px,3vw,28px);margin:0;font-weight:700}
+  .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid #27304133;border-radius:999px;padding:8px 12px;color:var(--muted);font-size:13px;background:transparent}
+  .card{
+    background:transparent; /* let the theme background breathe */
+    border-radius:var(--radius);
+    padding:0;
+  }
+
+  /* Controls */
+  .controls{display:flex;gap:12px;flex-wrap:wrap;margin-top:2px}
+  button{
+    appearance:none;border:1px solid #2a3240;color:var(--btnText);
+    background:linear-gradient(180deg,#9af3ea,#66eadf);
+    border-radius:14px;padding:14px 18px;font-weight:800;cursor:pointer;font-size:16px;
+    transition:transform .04s ease, filter .2s ease, opacity .2s ease
+  }
+  button.primary{filter:saturate(1.05)}
+  button:hover{transform:translateY(-1px);filter:brightness(1.05)}
+  button.ghost{background:#111827;color:var(--text);border-color:#2a3240}
+  button:disabled{opacity:.45;cursor:not-allowed}
+
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  select{
+    background:#111827;border:1px solid #2a3240;border-radius:12px;color:#e6e9ee;padding:10px 12px;font-weight:600
+  }
+
+  /* Board (the “text box”) */
+  .board{
+    background:var(--board-bg);
+    border:2px solid var(--board-border);
+    border-radius:16px;
+    padding:28px; min-height:220px;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+  .prompt{
+    color:var(--text);
+    font-size:clamp(var(--prompt-min),6vw,var(--prompt-max));
+    font-weight:800; letter-spacing:.4px; line-height:1.35;
+  }
+  .translation{
+    margin-top:18px; color:var(--muted);
+    font-size:clamp(var(--ans-min),5vw,var(--ans-max)); line-height:1.35;
+    display:none; /* hidden until Reveal */
+  }
+
+  /* Optional entrance effect (non-blocking) */
+  .fx-in{ animation:fadeSlide .28s ease; }
+  @keyframes fadeSlide{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;color:var(--muted);font-size:13px}
+  .spacer{flex:1}
+  .tiny{font-size:12px;color:var(--muted)}
+  a{color:#66eadf;text-decoration:none}
+</style>
+</head>
+<body class="theme-sleek">
+  <div class="wrap">
+    <header>
+      <div class="toolbar">
+        <h1 id="title" style="margin-right:6px">Sentence Trainer</h1>
+        <span class="pill" id="progress">0 / 0</span>
+      </div>
+      <div class="toolbar">
+        <label class="tiny" style="margin-right:6px">Theme</label>
+        <select id="theme">
+          <option value="sleek">Sleek</option>
+          <option value="playful">Playful</option>
+          <option value="exam">Exam-Mode</option>
+        </select>
+        <label class="tiny" style="margin-left:8px;margin-right:6px">Font size</label>
+        <select id="fontsize">
+          <option value="normal">Normal</option>
+          <option value="large" selected>Large (IWB)</option>
+          <option value="xl">XL (Hall)</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="controls">
+        <button id="new_en" class="primary">Show English</button>
+        <button id="new_tl" class="primary">Show Target Language</button>
+        <button id="reveal">Reveal</button>
+        <button id="speak" title="Speak target sentence">🔊 Speak</button>
+        <div class="spacer"></div>
+        <button id="undo" class="ghost">Undo</button>
+        <button id="reset" class="ghost">Reset</button>
+      </div>
+
+      <div class="board" style="margin-top:16px">
+        <div>
+          <div class="prompt fx-in" id="prompt">Choose a side to begin ↑</div>
+          <div class="translation" id="answer"></div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <span id="langBadge"></span>
+        <span class="spacer"></span>
+        <a href="index.html">← Back to input</a>
+      </div>
+      <div class="tiny" style="margin-top:8px">
+        Tips: Space = Reveal · E = English · T = Target · R = Reset · ⌘/Ctrl+Z = Undo
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ===== Load dataset =====
+  const data = JSON.parse(localStorage.getItem('trainer_dataset') || 'null');
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const langName = (data?.langName ?? 'Target Language').trim() || 'Target Language';
+  const langCode = (data?.langCode ?? '').trim();
+
+  // ===== UI refs =====
+  const title = document.getElementById('title');
+  const langBadge = document.getElementById('langBadge');
+  const progressEl = document.getElementById('progress');
+  const promptEl = document.getElementById('prompt');
+  const answerEl = document.getElementById('answer');
+  const btnEN = document.getElementById('new_en');
+  const btnTL = document.getElementById('new_tl');
+  const btnReveal = document.getElementById('reveal');
+  const btnReset = document.getElementById('reset');
+  const btnUndo = document.getElementById('undo');
+  const btnSpeak = document.getElementById('speak');
+  const themeSel = document.getElementById('theme');
+  const fontSel = document.getElementById('fontsize');
+
+  title.textContent = `Sentence Trainer — ${langName}`;
+  langBadge.textContent = `Dataset: ${langName} (${items.length} pairs${langCode ? ', TTS '+langCode : ''})`;
+
+  // Disable controls if no items
+  const controls = [btnEN, btnTL, btnReveal, btnReset, btnUndo, btnSpeak];
+  if (!items.length){
+    promptEl.textContent = 'No data found. Go back to Input and click “Start practice”.';
+    controls.forEach(b=>b.disabled = true);
+    return;
+  }
+
+  // ===== State =====
+  let poolEN = [...items.keys()];
+  let poolTL = [...items.keys()];
+  let current = null; // { idx, side }
+  updateProgress();
+
+  // ===== Helpers =====
+  function pick(pool){
+    if (!pool.length) return null;
+    const k = Math.floor(Math.random()*pool.length);
+    return pool.splice(k,1)[0];
+  }
+
+  function setPromptAndAnswer(promptText, answerText){
+    promptEl.textContent = promptText;
+    answerEl.textContent = answerText;
+    answerEl.style.display = 'none';          // ensure hidden until reveal
+    answerEl.setAttribute('aria-hidden','true');
+    promptEl.classList.remove('fx-in'); void promptEl.offsetWidth; promptEl.classList.add('fx-in');
+  }
+
+  function updateProgress(){
+    const total = items.length * 2;
+    const used = (items.length - poolEN.length) + (items.length - poolTL.length);
+    progressEl.textContent = `${used} / ${total}`;
+  }
+
+  function showPrompt(side){
+    if (side==='en' && poolEN.length===0) poolEN = [...items.keys()];
+    if (side==='tl' && poolTL.length===0) poolTL = [...items.keys()];
+    const pool = (side==='en') ? poolEN : poolTL;
+    const idx = pick(pool);
+    if (idx===null){
+      setPromptAndAnswer('Out of items — click Reset to start a new cycle.', '');
+      current = null; updateProgress(); return;
+    }
+    const pair = items[idx];
+    if (side==='en'){
+      setPromptAndAnswer(pair.en, pair.tl);
+    } else {
+      setPromptAndAnswer(pair.tl, pair.en);
+      speakTarget(pair.tl); // auto-speak TL
+    }
+    current = { idx, side };
+    updateProgress();
+  }
+
+  function reveal(){
+    // Guard: only reveal if a prompt was chosen and we have an answer
+    if (!current || !answerEl.textContent) return;
+    answerEl.style.display = 'block';         // <- key fix
+    answerEl.removeAttribute('aria-hidden');
+    answerEl.classList.remove('fx-in'); void answerEl.offsetWidth; answerEl.classList.add('fx-in');
+  }
+
+  function resetCycle(){
+    poolEN = [...items.keys()];
+    poolTL = [...items.keys()];
+    current = null;
+    setPromptAndAnswer('Cycle reset. Choose a side to begin ↑', '');
+    updateProgress();
+  }
+
+  function undo(){
+    if (!current) return;
+    const { idx, side } = current;
+    const pool = side==='en' ? poolEN : poolTL;
+    if (!pool.includes(idx)) pool.push(idx);
+    current = null;
+    setPromptAndAnswer('Undone. Choose again ↑', '');
+    updateProgress();
+  }
+
+  // Buttons
+  btnEN.addEventListener('click', ()=>showPrompt('en'));
+  btnTL.addEventListener('click', ()=>showPrompt('tl'));
+  btnReveal.addEventListener('click', reveal);
+  btnReset.addEventListener('click', resetCycle);
+  btnUndo.addEventListener('click', undo);
+
+  // Shortcuts
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    if (k==='e') showPrompt('en');
+    if (k==='t') showPrompt('tl');
+    if (e.key===' ') { e.preventDefault(); reveal(); }
+    if (k==='r') resetCycle();
+    if ((k==='z') && (e.ctrlKey || e.metaKey)) undo();
+  });
+
+  // ===== Themes =====
+  function applyTheme(name){
+    document.body.classList.remove('theme-sleek','theme-playful','theme-exam');
+    document.body.classList.add('theme-'+name);
+    localStorage.setItem('trainer_theme', name);
+  }
+  themeSel.value = localStorage.getItem('trainer_theme') || 'sleek';
+  applyTheme(themeSel.value);
+  themeSel.addEventListener('change', ()=>applyTheme(themeSel.value));
+
+  // ===== Font presets =====
+  function applyFontPreset(preset){
+    const root = document.documentElement;
+    if (preset==='normal'){
+      root.style.setProperty('--prompt-min','32px'); root.style.setProperty('--prompt-max','64px');
+      root.style.setProperty('--ans-min','28px'); root.style.setProperty('--ans-max','48px');
+    } else if (preset==='large'){
+      root.style.setProperty('--prompt-min','40px'); root.style.setProperty('--prompt-max','84px');
+      root.style.setProperty('--ans-min','34px'); root.style.setProperty('--ans-max','64px');
+    } else { // xl
+      root.style.setProperty('--prompt-min','56px'); root.style.setProperty('--prompt-max','112px');
+      root.style.setProperty('--ans-min','44px'); root.style.setProperty('--ans-max','84px');
+    }
+    localStorage.setItem('trainer_font', preset);
+  }
+  applyFontPreset(localStorage.getItem('trainer_font') || 'large');
+  fontSel.value = localStorage.getItem('trainer_font') || 'large';
+  fontSel.addEventListener('change', ()=>applyFontPreset(fontSel.value));
+
+  // ===== TTS (Target language only) =====
+  function pickVoice(){
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    if (langCode){
+      const exact = voices.find(v=>v.lang.toLowerCase()===langCode.toLowerCase());
+      if (exact) return exact;
+      const base = langCode.split('-')[0];
+      const fb = voices.find(v=>v.lang.toLowerCase().startsWith(base.toLowerCase()));
+      if (fb) return fb;
+    }
+    const nonEn = voices.find(v=>!/^en/i.test(v.lang));
+    return nonEn || voices[0];
+  }
+  let ttsVoice = null;
+  if ('speechSynthesis' in window){
+    speechSynthesis.onvoiceschanged = ()=>{ ttsVoice = pickVoice(); };
+    ttsVoice = pickVoice();
+  }
+  function speakTarget(text){
+    if (!text || !('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (ttsVoice) u.voice = ttsVoice;
+    if (langCode) u.lang = langCode;
+    u.rate = 1.0; u.pitch = 1.0;
+    speechSynthesis.speak(u);
+  }
+  btnSpeak.addEventListener('click', ()=>{
+    if (!current) return;
+    const pair = items[current.idx];
+    speakTarget(pair.tl);
+  });
+})();
+</script>
+</body>
+</html>
