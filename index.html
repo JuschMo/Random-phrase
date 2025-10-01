@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sentence Trainer — Input</title>
+  <link rel="icon" href="data:;base64,=">
+  <style>
+    :root{
+      --bg:#0f1216; --card:#151A21; --muted:#98a2b3; --text:#e6e9ee;
+      --accent:#66eadf; --accent-2:#b794f4; --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:16px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text);
+         background:radial-gradient(1200px 800px at 80% -10%,#1b2230 0%,#0f1216 55%) fixed;}
+    .wrap{max-width:960px;margin:6vh auto;padding:24px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    h1{font-size:clamp(20px,3vw,28px);margin:0;font-weight:700;letter-spacing:.2px}
+    .card{background:linear-gradient(180deg,#161C24,#12161C);
+          border:1px solid #212837;border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.35);
+          padding:22px}
+    textarea{width:100%;min-height:340px;background:#0f141a;border:1px solid #212837;border-radius:14px;
+             color:var(--text);padding:14px 16px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical}
+    .hint{color:var(--muted);font-size:13px;margin:10px 0 0}
+    .grid{display:grid;gap:14px;grid-template-columns:1fr 1fr 1fr;margin-top:14px}
+    input[type=text]{width:100%;background:#0f141a;border:1px solid #212837;border-radius:12px;color:var(--text);padding:10px 12px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+    button{appearance:none;border:1px solid #2a3240;color:#0b1b19;background:linear-gradient(180deg,#9af3ea,#66eadf);
+           border-radius:14px;padding:14px 18px;font-weight:800;cursor:pointer;font-size:16px;
+           transition:transform .04s ease, filter .2s ease}
+    button:hover{transform:translateY(-1px);filter:brightness(1.05)}
+    button.ghost{background:#0f141a;color:var(--text);border-color:#2a3240}
+    .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid #273041;border-radius:999px;padding:8px 12px;color:var(--muted);font-size:13px}
+    .footer{color:#7f8b9d;font-size:12px;margin-top:18px}
+    code.k{background:#0b1016;border:1px solid #1e2733;border-radius:8px;padding:2px 6px;color:#bfe2ff}
+    a{color:var(--accent);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Sentence Trainer — Input</h1>
+      <span class="pill">Step 1 of 2</span>
+    </header>
+
+    <div class="card">
+      <p><strong>Paste your pairs below</strong> — one pair per line. Use a comma or a tab between Target and English.</p>
+      <p class="hint">Examples:<br>
+        <code class="k">Wie geht’s?,How are you?</code><br>
+        <code class="k">Ich mag Geschichte.	&nbsp;I like History.</code>
+      </p>
+
+      <textarea id="pairs" placeholder="Guten Morgen,Good morning
+Ich habe am Montag Mathe.,I have Maths on Monday.
+Würdest du nach Berlin fahren?,Would you travel to Berlin?"></textarea>
+
+      <div class="grid">
+        <label>
+          <div class="hint">Target Language name (for the UI)</div>
+          <input id="langName" type="text" placeholder="e.g. German" />
+        </label>
+        <label>
+          <div class="hint">Target Language code (for TTS)</div>
+          <input id="langCode" type="text" placeholder="e.g. de-DE, fr-FR, es-ES" />
+        </label>
+        <label>
+          <div class="hint">Delimiter (auto-detects if blank)</div>
+          <input id="delimiter" type="text" placeholder="comma or tab" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="start">Start practice →</button>
+        <button id="download" class="ghost">Download JSON</button>
+        <button id="uploadBtn" class="ghost">Upload JSON</button>
+        <input type="file" id="upload" accept="application/json" style="display:none" />
+        <button id="loadSample" class="ghost">Load sample</button>
+      </div>
+
+      <p class="footer">Data is saved in your browser’s <em>localStorage</em>. No server needed.</p>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const txt = document.getElementById('pairs');
+  const delimInput = document.getElementById('delimiter');
+  const langName = document.getElementById('langName');
+  const langCode = document.getElementById('langCode');
+  const startBtn = document.getElementById('start');
+  const dlBtn = document.getElementById('download');
+  const upBtn = document.getElementById('uploadBtn');
+  const fileInput = document.getElementById('upload');
+  const sampleBtn = document.getElementById('loadSample');
+
+  function detectDelimiter(line){
+    if (delimInput.value.trim()) return delimInput.value.trim();
+    if (line.includes('\t')) return '\t';
+    if (line.includes(',')) return ',';
+    if (line.includes(' | ')) return ' | ';
+    return ',';
+  }
+
+  function parsePairs(raw){
+    const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    if (!lines.length) return [];
+    const d = detectDelimiter(lines[0]);
+    const data = [];
+    for(const line of lines){
+      const parts = line.split(d);
+      if (parts.length < 2) continue;
+      const tl = parts[0].trim();
+      const en = parts.slice(1).join(d).trim();
+      if (tl && en) data.push({ tl, en });
+    }
+    return data;
+  }
+
+  function saveAndGo(){
+    const items = parsePairs(txt.value);
+    if (!items.length){ alert('Please add at least one valid pair.'); return; }
+    const payload = {
+      langName: (langName.value || 'Target Language').trim(),
+      langCode: (langCode.value || '').trim(), // e.g. de-DE
+      createdAt: Date.now(),
+      items
+    };
+    localStorage.setItem('trainer_dataset', JSON.stringify(payload));
+    location.href = 'practice.html';
+  }
+
+  startBtn.addEventListener('click', saveAndGo);
+
+  dlBtn.addEventListener('click', ()=>{
+    const payload = {
+      langName: (langName.value || 'Target Language').trim(),
+      langCode: (langCode.value || '').trim(),
+      createdAt: Date.now(),
+      items: parsePairs(txt.value)
+    };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sentence-trainer-data.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  upBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', ()=>{
+    const f = fileInput.files?.[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const obj = JSON.parse(String(e.target.result));
+        if (!obj.items || !Array.isArray(obj.items)) throw new Error('No items array');
+        langName.value = obj.langName || '';
+        langCode.value = obj.langCode || '';
+        txt.value = obj.items.map(p=>`${p.tl},${p.en}`).join('\n');
+        alert('Loaded JSON successfully.');
+      }catch(err){ alert('Could not read JSON file.'); }
+    };
+    reader.readAsText(f);
+  });
+
+  sampleBtn.addEventListener('click', ()=>{
+    langName.value = 'German';
+    langCode.value = 'de-DE';
+    txt.value = [
+      'Wie geht’s?,How are you?',
+      'Ich mag Mathe.,I like Maths.',
+      'Am Freitag würde ich schwimmen.,On Friday I would swim.',
+      'Könnten Sie das wiederholen?,Could you repeat that?',
+      'Die Hausaufgaben sind schwierig.,The homework is difficult.'
+    ].join('\n');
+  });
+})();
+</script>
+</body>
+</html>
